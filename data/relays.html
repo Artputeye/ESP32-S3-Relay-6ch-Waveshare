@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARTTECH - RELAY CONTROL</title>
+  <link rel="stylesheet" href="substyle.css" />
+  <link rel="stylesheet" href="mainstyle.css" />
+</head>
+
+<body>
+  <header class="navbar">
+    <div class="navbar-brand">
+      <a href="index.html" class="navbar-logo-link">
+        <span class="navbar-text">ARTTECH</span>
+      </a>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div class="blockhead">
+      <div class="blockname">
+        <!-- เพิ่ม id="device-name-head" เข้าไปตรงนี้ -->
+        <p class="namehead" id="device-name-head">RELAY 6 CHANNELS</p>
+      </div>
+    </div>
+
+    <div class="blockcontent">
+      <!-- Relay 1 -->
+      <div class="toggle-row">
+        <span class="toggle-text" id="relay-name-1">Relay Channel 1</span>
+        <label class="switch">
+          <input type="checkbox" id="relay1" onchange="toggleRelay(1, this.checked)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Relay 2 -->
+      <div class="toggle-row">
+        <span class="toggle-text" id="relay-name-2">Relay Channel 2</span>
+        <label class="switch">
+          <input type="checkbox" id="relay2" onchange="toggleRelay(2, this.checked)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Relay 3 -->
+      <div class="toggle-row">
+        <span class="toggle-text" id="relay-name-3">Relay Channel 3</span>
+        <label class="switch">
+          <input type="checkbox" id="relay3" onchange="toggleRelay(3, this.checked)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Relay 4 -->
+      <div class="toggle-row">
+        <span class="toggle-text" id="relay-name-4">Relay Channel 4</span>
+        <label class="switch">
+          <input type="checkbox" id="relay4" onchange="toggleRelay(4, this.checked)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Relay 5 -->
+      <div class="toggle-row">
+        <span class="toggle-text" id="relay-name-5">Relay Channel 5</span>
+        <label class="switch">
+          <input type="checkbox" id="relay5" onchange="toggleRelay(5, this.checked)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Relay 6 -->
+      <div class="toggle-row">
+        <span class="toggle-text" id="relay-name-6">Relay Channel 6</span>
+        <label class="switch">
+          <input type="checkbox" id="relay6" onchange="toggleRelay(6, this.checked)" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="blockdummy"></div>
+  </div>
+
+  <script src="relays.js"></script>
+</body>
+
+</html>

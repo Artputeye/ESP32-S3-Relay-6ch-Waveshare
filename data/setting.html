@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARTTECH</title>
+  <link rel="stylesheet" href="substyle.css" />
+  <link rel="stylesheet" href="mainstyle.css" />
+</head>
+
+<body>
+  <header class="navbar">
+    <div class="navbar-brand">
+      <a href="index.html" class="navbar-logo-link">
+        <span class="navbar-text">ARTTECH</span>
+      </a>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div class="blockhead">
+      <div class="blockname">
+        <p class="namehead">SETTING</p>
+
+      </div>
+    </div>
+
+    <div class="blockcontent">
+      <div class="para-name"><span>Device Name</span></div>
+      <form class="setting-input" data-setting="device_name">
+        <div class="form-row">
+          <input class="text-input" type="text" id="device_name" name="device_name"
+            placeholder="Device Name" required />
+        </div>
+      </form>
+
+      <div class="para-name"><span>Friendly Name 1</span></div>
+      <form class="setting-input" data-setting="friendly_name_1">
+        <div class="form-row">
+          <input class="text-input" type="text" id="friendly_name_1" name="friendly_name_1"
+            placeholder="Friendly Name 1" required />
+        </div>
+      </form>
+
+      <div class="para-name"><span>Friendly Name 2</span></div>
+      <form class="setting-input" data-setting="friendly_name_2">
+        <div class="form-row">
+          <input class="text-input" type="text" id="friendly_name_2" name="friendly_name_2"
+            placeholder="Friendly Name 2" required />
+        </div>
+      </form>
+
+      <div class="para-name"><span>Friendly Name 3</span></div>
+      <form class="setting-input" data-setting="friendly_name_3">
+        <div class="form-row">
+          <input class="text-input" type="text" id="friendly_name_3" name="friendly_name_3"
+            placeholder="Friendly Name 3" required />
+        </div>
+      </form>
+
+      <div class="para-name"><span>Friendly Name 4</span></div>
+      <form class="setting-input" data-setting="friendly_name_4">
+        <div class="form-row">
+          <input class="text-input" type="text" id="friendly_name_4" name="friendly_name_4"
+            placeholder="Friendly Name 4" required />
+        </div>
+      </form>
+
+      <div class="para-name"><span>Friendly Name 5</span></div>
+      <form class="setting-input" data-setting="friendly_name_5">
+        <div class="form-row">
+          <input class="text-input" type="text" id="friendly_name_5" name="friendly_name_5"
+            placeholder="Friendly Name 5" required />
+        </div>
+      </form>
+
+      <div class="para-name"><span>Friendly Name 6</span></div>
+      <form class="setting-input" data-setting="friendly_name_6">
+        <div class="form-row">
+          <input class="text-input" type="text" id="friendly_name_6" name="friendly_name_6"
+            placeholder="Friendly Name 6" required />
+        </div>
+      </form>
+
+
+      <div class="card-middle">
+        <button class="button-save" onclick="sendConfig()">SAVE</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="setting.js"></script>
+</body>
+
+</html>
