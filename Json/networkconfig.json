@@ -1,8 +1,9 @@
 {
-    "WIFI Name": "IoT",
-    "WIFI Pass": "IoT81234",
-    "MQTT User": "inverter",
-    "MQTT Pass": "12345678",
-    "MQTT Server": "192.168.1.247",
-    "MQTT Port": "1883"
+  "wifi_ssid": "IoT",
+  "wifi_pass": "IoT81234",
+  "host_name": "relay",
+  "mqtt_user": "hibay2",
+  "mqtt_pass": "12345678",
+  "mqtt_server": "192.168.1.247",
+  "mqtt_port": 1883
 }

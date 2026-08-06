@@ -1,13 +1,19 @@
 // ha_integration.h
 #ifndef HA_INTEGRATION_H
 #define HA_INTEGRATION_H
+
+#pragma once
 #include "config.h"
 
+extern const char *discovery_prefix;
+extern char availability_topic[128];
+extern char state_topic[128];
+
+void init_ha_topics();
 void iotHAsetup();
 void iotHAloop();
 void send_ha_discovery();
-void reconnect();
 void publish_all_states();
-void send_sensor_config(const char* object_id, const char* name, const char* unit, const char* device_class, const char* icon, const char* category);
+void reconnect();
 
 #endif

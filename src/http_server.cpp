@@ -75,7 +75,7 @@ void staticRoot()
 void terminalSetting() // control route
 {
   server.on("/terminalSet", HTTP_POST, [](AsyncWebServerRequest *request)
-            {
+  {
     String message;
     if (request->hasParam(PARAM_MESSAGE, true)) {
       message = request->getParam(PARAM_MESSAGE, true)->value();
@@ -83,9 +83,25 @@ void terminalSetting() // control route
       message = "No message sent";
       LOGI("No message sent");
     }
-    // inv.sendCommand(message);
+
     LOGI("POST client: %s", message.c_str());
-    request->send(200, "text/plain", "POST: " + message); });
+
+    // 🔴 เพิ่มเงื่อนไขเช็คคำว่า "espreset" (ไม่สนตัวพิมพ์เล็ก-ใหญ่)
+    if (message.equalsIgnoreCase("espreset")) {
+      LOGW("⚠️ Reset command received via Terminal! Restarting ESP32...");
+      
+      // ส่ง Response ตอบกลับไปหา Client ก่อนรีบูต
+      request->send(200, "text/plain", "ESP32 is restarting...");
+      
+      // หน่วงเวลา 500ms เพื่อให้แพ็กเกจ HTTP Response ส่งออกสำเร็จก่อนดักดับบอร์ด
+      vTaskDelay(pdMS_TO_TICKS(500));
+      ESP.restart();
+      return;
+    }
+
+    // inv.sendCommand(message);
+    request->send(200, "text/plain", "POST: " + message); 
+  });
 }
 
 /**

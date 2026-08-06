@@ -1,16 +1,29 @@
 #include "ha_integration.h"
 
 const char *discovery_prefix = "homeassistant";
-const char *availability_topic = "homeassistant/switch/relay_6ch/availability";
-const char *state_topic = "homeassistant/switch/relay_6ch/state";
+char availability_topic[128] = "";
+char state_topic[128] = "";
 
 unsigned long lastMsg = 0;
 
 void mqtt_callback(char *topic, byte *payload, unsigned int length);
 
+void init_ha_topics()
+{
+  snprintf(availability_topic, sizeof(availability_topic), "homeassistant/switch/%s/availability", DEVICE_NAME);
+  snprintf(state_topic, sizeof(state_topic), "homeassistant/switch/%s/state", DEVICE_NAME);
+
+  LOGI("MQTT Topics Initialized:");
+  LOGI("  Availability : %s", availability_topic);
+  LOGI("  State        : %s", state_topic);
+}
+
 void iotHAsetup()
 {
-  // ตัดการตั้งค่า pinMode ออก ให้ไปจัดการใน relay_setup()
+  // โหลดค่า setting.json ก่อนเริ่มตั้งค่า MQTT
+  loadAllSettings();
+  init_ha_topics();
+
   client.setServer(MQTT_SERVER, MQTT_PORT);
   client.setCallback(mqtt_callback);
   client.setBufferSize(4096);
@@ -37,8 +50,8 @@ void iotHAloop()
 void send_switch_config(int relay_num)
 {
   String object_id = "relay_" + String(relay_num);
-  String config_topic = String(discovery_prefix) + "/switch/" + device_id + "/" + object_id + "/config";
-  String command_topic = String(discovery_prefix) + "/switch/" + device_id + "/" + object_id + "/set";
+  String config_topic = String(discovery_prefix) + "/switch/" + DEVICE_NAME + "/" + object_id + "/config";
+  String command_topic = String(discovery_prefix) + "/switch/" + DEVICE_NAME + "/" + object_id + "/set";
 
   JsonDocument doc;
   
@@ -55,7 +68,7 @@ void send_switch_config(int relay_num)
   String value_template = String("{{ value_json.") + object_id + " }}";
   doc["value_template"] = value_template.c_str();
 
-  String unique_id = String(device_id) + "_" + object_id;
+  String unique_id = String(DEVICE_NAME) + "_" + object_id;
   doc["unique_id"] = unique_id.c_str();
 
   doc["payload_on"] = "ON";
@@ -68,8 +81,8 @@ void send_switch_config(int relay_num)
 
   JsonObject dev = doc["device"].to<JsonObject>();
   JsonArray ids = dev["identifiers"].to<JsonArray>();
-  ids.add(device_id);
-  dev["name"] = DEVICE_NAME;
+  ids.add(DEVICE_NAME);
+  dev["name"] = (DEVICE_NAME && strlen(DEVICE_NAME) > 0) ? DEVICE_NAME : "ESP32-S3 6CH Relay WAVESHARE";
   dev["sw_version"] = D_SWVersion;
   dev["manufacturer"] = D_Mfac;
   dev["model"] = D_Model;
@@ -85,7 +98,7 @@ void send_switch_config(int relay_num)
 
 void send_sensor_config(const char *object_id, const char *name, const char *unit, const char *device_class, const char *icon, const char *category)
 {
-  String config_topic = String(discovery_prefix) + "/sensor/" + device_id + "/" + object_id + "/config";
+  String config_topic = String(discovery_prefix) + "/sensor/" + DEVICE_NAME + "/" + object_id + "/config";
 
   JsonDocument doc;
   doc["name"] = name;
@@ -94,7 +107,7 @@ void send_sensor_config(const char *object_id, const char *name, const char *uni
   String value_template = String("{{ value_json.") + object_id + " }}";
   doc["value_template"] = value_template.c_str();
 
-  String unique_id = String(device_id) + "_" + object_id;
+  String unique_id = String() + "_" + object_id;
   doc["unique_id"] = unique_id.c_str();
 
   if (unit && strlen(unit) > 0) doc["unit_of_measurement"] = unit;
@@ -108,8 +121,8 @@ void send_sensor_config(const char *object_id, const char *name, const char *uni
 
   JsonObject dev = doc["device"].to<JsonObject>();
   JsonArray ids = dev["identifiers"].to<JsonArray>();
-  ids.add(device_id);
-  dev["name"] = DEVICE_NAME;
+  ids.add(DEVICE_NAME);
+  dev["name"] = (DEVICE_NAME && strlen(DEVICE_NAME) > 0) ? DEVICE_NAME : "ESP32-S3 6CH Relay WAVESHARE";
   dev["sw_version"] = D_SWVersion;
   dev["manufacturer"] = D_Mfac;
   dev["model"] = D_Model;
@@ -185,10 +198,9 @@ void mqtt_callback(char *topic, byte *payload, unsigned int length)
 
   for (int i = 1; i <= 6; i++)
   {
-    String expectedTopic = String(discovery_prefix) + "/switch/" + device_id + "/relay_" + String(i) + "/set";
+    String expectedTopic = String(discovery_prefix) + "/switch/" + DEVICE_NAME + "/relay_" + String(i) + "/set";
     if (topicStr == expectedTopic)
     {
-      // ปรับเปลี่ยนเฉพาะตัวแปร relay_states[] (การขับฮาร์ดแวร์จริงปล่อยให้ relay_loop บน Core 0 จัดการ)
       if (message == "ON")
       {
         relay_states[i - 1] = true;
@@ -214,7 +226,6 @@ void reconnect()
     if (now - lastReconnectAttempt > 5000)
     {
       lastReconnectAttempt = now;
-      //LOGI("Attempting MQTT connection...");
 
       if (client.connect("ESP32_S3_Relay_6CH", MQTT_USER, MQTT_PASS, availability_topic, 0, true, "offline"))
       {
@@ -222,12 +233,6 @@ void reconnect()
         send_ha_discovery();
         client.publish(availability_topic, "online", true);
         publish_all_states();
-      }
-      else
-      {
-        // LOGI("failed, rc=");
-        // LOGI(client.state());
-        // LOGI(" try again in 5 seconds");
       }
     }
   }

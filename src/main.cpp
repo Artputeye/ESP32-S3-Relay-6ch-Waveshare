@@ -1,29 +1,43 @@
 // main.cpp
 #include "config.h"
+#include <esp_task_wdt.h> // ต้อง include header WDT ของ IDF 5.x
 
 // --- Function Prototypes ---
 void TaskMain(void *pvParameters);
 void TaskSub(void *pvParameters);
 void TaskLED(void *pvParameters);
-void TaskSerialReader(void *pvParameters);
+
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 void setup()
 {
+    // 1. Initial Hardware Pins
     pinMode(STATUS_LED, OUTPUT);
     digitalWrite(STATUS_LED, HIGH);
     pinMode(AP_PIN, INPUT_PULLUP);
 
-    Serial.begin(115200);
-    delay(500); // ให้เวลาฮาร์ดแวร์ UART นิ่งก่อน
-    Serial.flush(); // ล้างข้อมูลค้างใน Buffer
-    // รอให้ Serial พร้อมทำงาน (สูงสุดไม่เกิน 3 วินาที)
-    unsigned long start = millis();
-    while (!Serial && (millis() - start < 3000));
+    // 2. Setup Serial & Native USB CDC
+    // ตั้งค่าไม่ให้ Serial.print ค้างรอ (Non-blocking) เมื่อบัฟเฟอร์ USB เต็ม
+    Serial.setTxTimeoutMs(0); 
+    Serial.begin(921600);
 
-    // 1. Mount LittleFS ก่อนเสมอ
+    // หน่วงเวลารอให้ USB CDC ของ ESP32-S3 สถาปนาการเชื่อมต่อกับคอมพิวเตอร์
+    // ป้องกันปัญหา Log ใน setup() หล่นหายช่วงบูท
+    unsigned long startUsb = millis();
+    while (!Serial && (millis() - startUsb < 3500))
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    vTaskDelay(pdMS_TO_TICKS(500)); // ให้เวลา Terminal ปรับตัวเล็กน้อย
+
+    Serial.println();
+    Serial.println("==================================================");
+    Serial.println("🚀 ESP32-S3 System Booting...");
+    Serial.println("==================================================");
+
+    // 3. Mount LittleFS File System
     if (!LittleFS.begin(true))
     {
         Serial.println("❌ LittleFS Mount Failed!");
@@ -34,63 +48,74 @@ void setup()
         loadAllSettings();
     }
 
+    // เริ่มต้นระบบ Logger และพิมพ์สถานะ
     LoggerBegin();
 
-    unsigned long startSerial = millis();
-    while (!Serial && millis() - startSerial < 3000)
-        ;
-
-    LOGI("Booting");
-    for (int i = 0; i < 5; i++)
+    LOGI("Booting Process Started...");
+    for (int i = 0; i < 3; i++)
     {
         LOGI(".");
-        delay(300);
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
-    Serial.println();
-    delay(500);
 
-    displayLogs(); // 2. เรียกใช้งานหลัง Mount LittleFS แล้ว
+    displayLogs();
     checkAndLogResetReason();
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(200));
 
+    // 4. Network & Home Assistant Setup
     network_setup();
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    // ต้องเรียก iotHAsetup() เสมอเพื่อ new Heap Memory ให้ Pointer เซนเซอร์
+    iotHAsetup();
 
     if (WiFi.status() == WL_CONNECTED)
     {
-        iotHAsetup();
         NTPbegin();
     }
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(200));
 
-    if (MDNS.begin(device_id))
+    if (MDNS.begin(HOST_NAME))
     {
-        LOGI("[System] mDNS Started: %s.local\n", device_id);
+        LOGI("[System] mDNS Started: %s.local", HOST_NAME);
     }
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(200));
 
     app_setup();
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(200));
 
-    // Watchdog Configuration (ESP32-IDF Style)
-    // หมายเหตุ: หากใช้ ESP32 Core 3.x ขึ้นไป อาจต้องปรับ syntax ตามที่แจ้งในรอบก่อน
+    // =========================================================
+    // 5. Watchdog Configuration (รองรับ Core 3.x / ESP-IDF v5.x)
+    // =========================================================
+#if defined(ESP_IDF_VERSION_MAJOR) && (ESP_IDF_VERSION_MAJOR >= 5)
+    // สำหรับ Core 3.x (ESP-IDF v5.x)
+    esp_task_wdt_config_t twdt_config = {
+        .timeout_ms = WDT_TIMEOUT * 1000,
+        .idle_core_mask = (1 << portNUM_PROCESSORS) - 1, // เฝ้าระวังทุก Core
+        .trigger_panic = true
+    };
+    esp_task_wdt_init(&twdt_config);
+#else
+    // สำหรับ Core 2.x (ESP-IDF v4.x)
     esp_task_wdt_init(WDT_TIMEOUT, true);
-    esp_task_wdt_delete(NULL); // ไม่ใช้ Loop() หลักคุม WDT
+    esp_task_wdt_delete(NULL);
+#endif
 
-    // Task Creation (แบ่งโหลดความสำคัญ)
-    // Core 0: งานหลัก (Processing/Operation)
-    // Core 1: งานสื่อสาร (WiFi/MQTT/Web) และ UI (LED)
+    // =========================================================
+    // 6. FreeRTOS Task Creation
+    // =========================================================
+    // Core 0: งานประมวลผลคำนวณหลัก
+    // Core 1: งานสื่อสารและเครือข่ายทั้งหมด (WiFi, MQTT, Web)
     xTaskCreatePinnedToCore(TaskMain, "Main", 4096, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(TaskSub, "Sub", 8192, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(TaskLED, "LED", 2048, NULL, 1, NULL, 1);
-    xTaskCreatePinnedToCore(TaskSerialReader, "SerialReader", 4096, NULL, 1, NULL, 0);
 
-    LOGI(("[System] Setup Complete"));
+    LOGI("[System] Setup Complete");
 }
 
 void loop()
 {
-    // ปล่อยว่างไว้ เพราะเราใช้ TaskManagement (FreeRTOS)
+    // ใน Core 3.x การสั่ง vTaskDelete(NULL) ใน loop() จะคืนทรัพยากรให้ Idle Task สมบูรณ์
     vTaskDelete(NULL);
 }
 
@@ -99,8 +124,9 @@ void loop()
 // ---------------------------------------------------------
 void TaskMain(void *pvParameters)
 {
-    esp_task_wdt_add(NULL); // เพิ่มตัวมันเองลงใน Watchdog
+    esp_task_wdt_add(NULL); // ลงทะเบียน Task นี้เข้า WDT
     unsigned long lastMain = 0;
+
     for (;;)
     {
         esp_task_wdt_reset();
@@ -109,8 +135,6 @@ void TaskMain(void *pvParameters)
         if (millis() - lastMain > 60000)
         {
             lastMain = millis();
-            // ตรวจสอบ Stack เพื่อป้องกันโปรแกรมแฮงค์ (Debug)
-            // LOGI("[Debug] Main Stack: %u\n", uxTaskGetStackHighWaterMark(NULL));
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -121,8 +145,9 @@ void TaskMain(void *pvParameters)
 // ---------------------------------------------------------
 void TaskSub(void *pvParameters)
 {
-    esp_task_wdt_add(NULL);
+    esp_task_wdt_add(NULL); // ลงทะเบียน Task นี้เข้า WDT
     unsigned long lastStatus = 0;
+
     for (;;)
     {
         esp_task_wdt_reset();
@@ -136,7 +161,7 @@ void TaskSub(void *pvParameters)
             lastStatus = millis();
             showAPClients();
         }
-        vTaskDelay(pdMS_TO_TICKS(30)); // ปรับเป็น 30ms ช่วยคืน CPU ให้ WebServer
+        vTaskDelay(pdMS_TO_TICKS(30));
     }
 }
 
@@ -149,36 +174,5 @@ void TaskLED(void *pvParameters)
     {
         ledPatternSelect();
         vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
-
-// ---------------------------------------------------------
-// Task สำหรับดักฟัง Serial (Core 0)
-// ---------------------------------------------------------
-void TaskSerialReader(void *pvParameters)
-{
-    static String buffer = "";
-    for (;;)
-    {
-        while (Serial.available() > 0)
-        {
-            char c = Serial.read();
-            if (c == '\n') // อ่านจนจบบรรทัด
-            {
-                buffer.trim();
-                if (buffer.length() > 0)
-                {
-                    LOGI("Received: ");
-                    LOGI("%s", buffer.c_str());
-                    processSerialCommand(buffer);
-                }
-                buffer = ""; // เคลียร์บัฟเฟอร์
-            }
-            else if (c != '\r')
-            {
-                buffer += c;
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(20)); // หน่วงเวลาให้ Task อื่นทำงานได้
     }
 }

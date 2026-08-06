@@ -38,11 +38,12 @@ extern char D_Mfac[15];
 extern char D_Model[28];
 
 // --- Network Settings ---
-extern char DEVICE_NAME[28];
+extern char DEVICE_NAME[40];
 extern char DEVICE_PASS[28];
 extern char WIFI_SSID[30];
 extern char WIFI_PASS[25];
-extern const char *device_id;
+extern char HOST_NAME[40];
+
 
 // --- Static IP Settings ---
 extern char DIVICE_IP[16];

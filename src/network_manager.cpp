@@ -41,10 +41,11 @@ void network_setup()
     {
         LOGI("✅ LittleFS Mounted");
     }
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     WiFi.onEvent(WiFiEvent);
     readNetworkConfig();
+
     if (isWifiApMode == 1)
     { // STA Mode
         setupIPConfig();
@@ -53,17 +54,16 @@ void network_setup()
     setupWiFiMode();
 
     initWebRoutes();
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     ws_init();
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     setupOTAManagement();
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     server.begin();
     LOGI("🌐 HTTP Server Started");
-    delay(500);
 }
 
 void mac_config()
@@ -76,7 +76,7 @@ void mac_config()
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     MacAddr = String(tempMac); // เก็บลงตัวแปร Global String
-    
+
     // รวมเป็นข้อความบรรทัดเดียว ป้องกันข้อความใน Serial แตกกระจาย
     LOGI("Device MAC Address: %s", tempMac);
 }
@@ -135,6 +135,13 @@ void readNetworkConfig()
 
     LOGD("📂 File opened. Size: %d bytes", file.size());
 
+    // =================================================================
+    // ✅ จุดที่แก้ไข: อ่านและพิมพ์ข้อความดิบจากไฟล์ลงมอนิเตอร์เพื่อตรวจสอบ
+    // =================================================================
+    String rawContent = file.readString();
+    //LOGD("📄 Raw File Content in Flash: %s", rawContent.c_str());
+    file.seek(0); // 👈 ย้อน Pointer กลับไปจุดเริ่มต้นไฟล์ เพื่อให้ deserializeJson อ่านต่อได้
+
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
     file.close();
@@ -145,10 +152,11 @@ void readNetworkConfig()
         return;
     }
 
-    isWifiApMode = atoi(doc["wifi_mode"] | "0");
-    isIpConfigStatic = atoi(doc["ip_config"] | "0");
+    // ดึงเป็น int ตรงๆ (รองรับทั้งกรณีหน้าเว็บส่ง "1" หรือ 1 มา)
+    isWifiApMode = doc["wifi_mode"].as<int>();
+    isIpConfigStatic = doc["ip_config"].as<int>();
 
-    strlcpy(WIFI_SSID, doc["wifi_ssid"] | "NONE", sizeof(WIFI_SSID));
+    strlcpy(WIFI_SSID, doc["wifi_ssid"] | "", sizeof(WIFI_SSID));
     strlcpy(WIFI_PASS, doc["wifi_pass"] | "", sizeof(WIFI_PASS));
     strlcpy(MAC_RECEIVE, doc["mac_receive"] | "", sizeof(MAC_RECEIVE));
 
@@ -159,15 +167,12 @@ void readNetworkConfig()
     strlcpy(MQTT_SERVER, doc["mqtt_server"] | "", sizeof(MQTT_SERVER));
     strlcpy(MQTT_USER, doc["mqtt_user"] | "", sizeof(MQTT_USER));
     strlcpy(MQTT_PASS, doc["mqtt_pass"] | "", sizeof(MQTT_PASS));
-    const char *id_val = doc["device_id"].as<const char *>();
-    if (id_val != nullptr)
-    {
-        snprintf((char *)device_id, sizeof(device_id), "%s", id_val);
-    }
+    strlcpy(HOST_NAME, doc["host_name"] | "relay", sizeof(HOST_NAME));
+
 
     MQTT_PORT = atoi(doc["mqtt_port"] | "1883");
 
-    // ================== DEBUG AFTER MAPPING (เปลี่ยนเป็น LOGD) ==================
+    // ================== DEBUG AFTER MAPPING ==================
     LOGD("✅ Config Loaded Successfully:");
     LOGD("  WIFI_SSID    : %s", WIFI_SSID);
     LOGD("  WIFI_MODE    : %s (%d)", (isWifiApMode == 1 ? "STA" : "AP"), isWifiApMode);
@@ -177,12 +182,12 @@ void readNetworkConfig()
     LOGD("  SUBNET_MASK  : %s", SUBNET_MASK);
     LOGD("  GATEWAY      : %s", GATEWAY);
     LOGD("  MQTT_SERVER  : %s:%d", MQTT_SERVER, MQTT_PORT);
-    LOGD("  device_id    : %s", device_id);
+
 
     // ================== MAC Parse ==================
     if (parseMacAddress(MAC_RECEIVE, MAC_RX))
     {
-        LOGD("  MAC_RX Parsed: %02X:%02X:%02X:%02X:%02X:%02X", 
+        LOGD("  MAC_RX Parsed: %02X:%02X:%02X:%02X:%02X:%02X",
              MAC_RX[0], MAC_RX[1], MAC_RX[2], MAC_RX[3], MAC_RX[4], MAC_RX[5]);
     }
     else
@@ -197,23 +202,37 @@ void setupWiFiMode()
     { // AP MODE
         LOGI("📡 Starting AP Mode...");
         ledMode = LED_AP_MODE;
-        WiFi.disconnect(true, true);
-        delay(500);
-        WiFi.mode(WIFI_OFF);
-        delay(500);
+
+        // ใน Core 3.x การล้างค่า WiFi ให้ใช้การตั้ง Mode โดยตรง
+        WiFi.persistent(false);
         WiFi.mode(WIFI_AP);
-        WiFi.softAP(
-            DEVICE_NAME,
+
+        // กำหนด IP สำหรับ AP Mode ชัดเจน
+        IPAddress apIP(192, 168, 4, 1);
+        IPAddress apSubnet(255, 255, 255, 0);
+        WiFi.softAPConfig(apIP, apIP, apSubnet);
+
+        // เช็คว่า DEVICE_NAME มีค่าจริงไหม หากไม่มีให้ใช้ชื่อ Default
+        const char *apSSID = (DEVICE_NAME && strlen(DEVICE_NAME) > 0) ? DEVICE_NAME : "ESP32S3 WAVESHARE";
+
+        bool apCreated = WiFi.softAP(
+            apSSID,
             "12345678",
-            6,     // channel
-            false, // hidden
-            4      // max client
+            6, // channel
+            0, // hidden (0 = visible)
+            4  // max client
         );
 
-        LOGI("✅ AP Started | SSID: %s | IP: %s | Clients: %d", 
-             WiFi.softAPSSID().c_str(), 
-             WiFi.softAPIP().toString().c_str(), 
-             WiFi.softAPgetStationNum());
+        if (apCreated)
+        {
+            LOGI("✅ AP Started | SSID: %s | IP: %s",
+                 WiFi.softAPSSID().c_str(),
+                 WiFi.softAPIP().toString().c_str());
+        }
+        else
+        {
+            LOGE("❌ Failed to start AP Mode!");
+        }
     }
     else
     { // STA MODE
@@ -227,16 +246,16 @@ void setupWiFiMode()
         int timeoutCounter = 0;
         while (WiFi.status() != WL_CONNECTED && timeoutCounter < 20) // รอนานสุด 10 วินาที
         {
-            delay(500);
+            vTaskDelay(pdMS_TO_TICKS(500)); // เปลี่ยน delay เป็น vTaskDelay เพื่อไม่บล็อก Task อื่น
             timeoutCounter++;
         }
 
         if (WiFi.status() == WL_CONNECTED)
         {
             ledMode = LED_CONNECTED;
-            LOGI("✅ WiFi Connected | SSID: %s | IP: %s | RSSI: %d dBm", 
-                 WiFi.SSID().c_str(), 
-                 WiFi.localIP().toString().c_str(), 
+            LOGI("✅ WiFi Connected | SSID: %s | IP: %s | RSSI: %d dBm",
+                 WiFi.SSID().c_str(),
+                 WiFi.localIP().toString().c_str(),
                  WiFi.RSSI());
         }
         else
@@ -290,8 +309,8 @@ void WiFiEvent(WiFiEvent_t event)
 
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
         ledMode = LED_DISCONNECTED;
-        LOGW("⚠️ WiFi Lost Connection. Reconnecting...");
-        WiFi.reconnect();
+        LOGW("⚠️ WiFi Lost Connection.");
+        // ใน Core 3.x ไม่จำเป็นต้องสั่ง WiFi.reconnect() ในนี้เพื่อป้องกัน Event Loop
         break;
 
     default:
@@ -334,7 +353,7 @@ void showAPClients()
             {
                 esp_netif_sta_info_t station = netif_sta_list.sta[i];
                 LOGD(" - [%d] MAC: %02X:%02X:%02X:%02X:%02X:%02X | IP: %s",
-                     i + 1, 
+                     i + 1,
                      station.mac[0], station.mac[1], station.mac[2],
                      station.mac[3], station.mac[4], station.mac[5],
                      ip4addr_ntoa((ip4_addr_t *)&station.ip.addr));

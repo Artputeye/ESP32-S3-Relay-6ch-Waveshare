@@ -11,11 +11,13 @@ char D_Mfac[15] = "Waveshare"; //ARTTECH
 char D_Model[28] = "ARTTECH"; //ESP32-S3-Relay-6CH
 
 // --- Network Settings ---
-char DEVICE_NAME[28] = "Hibay Zone 1"; // ESP32-S3 6CH Relay
+char DEVICE_NAME[40] ; // ESP32-S3 6CH Relay
 char DEVICE_PASS[28] = "12345678"; //12345678
 char WIFI_SSID[30] = "";
 char WIFI_PASS[25] = "";
-const char *device_id = "hibay1_relay"; // Unique ID ใหม่สำหรับอุปกรณ์
+char HOST_NAME[40]; 
+// Unique ID ใหม่สำหรับอุปกรณ์
+
 
 // --- Static IP Settings ---
 char DIVICE_IP[16];

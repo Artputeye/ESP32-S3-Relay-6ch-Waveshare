@@ -80,7 +80,8 @@ function loadConfig() {
       // Input field
       document.getElementById("wifi_ssid").value = config.wifi_ssid || "";
       document.getElementById("wifi_pass").value = config.wifi_pass || "";
-      document.getElementById("device_id").value = config.device_id || "";
+      
+      document.getElementById("host_name").value = config.host_name || "";
       document.getElementById("mqtt_user").value = config.mqtt_user || "";
       document.getElementById("mqtt_pass").value = config.mqtt_pass || "";
       document.getElementById("mqtt_server").value = config.mqtt_server || "";

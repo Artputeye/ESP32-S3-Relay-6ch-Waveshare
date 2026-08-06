@@ -17,7 +17,6 @@ String friendlyNames[6] = {
     "Relay Channel 6"
 };
 
-// แสดงรายการไฟล์ทั้งหมด (รองรับ Sub-folder)
 void listAllFiles(const char *dirname, uint8_t levels)
 {
     LOGI("Listing directory: %s\n", dirname);
@@ -61,7 +60,6 @@ void formatFS()
     }
 }
 
-// ฟังก์ชันกลางสำหรับโหลด JSON
 bool loadJsonFile(const char *filename, JsonDocument &doc)
 {
     if (!LittleFS.exists(filename))
@@ -71,8 +69,11 @@ bool loadJsonFile(const char *filename, JsonDocument &doc)
     }
 
     File file = LittleFS.open(filename, "r");
-    if (!file)
+    if (!file || file.size() == 0)
+    {
+        if (file) file.close();
         return false;
+    }
 
     DeserializationError error = deserializeJson(doc, file);
     file.close();
@@ -85,10 +86,9 @@ bool loadJsonFile(const char *filename, JsonDocument &doc)
     return true;
 }
 
-// ฟังก์ชันกลางสำหรับบันทึก JSON
 bool saveJsonFile(const char *filename, const JsonDocument &doc)
 {
-    File file = LittleFS.open(filename, "w"); // "w" จะทับไฟล์เดิมโดยอัตโนมัติ
+    File file = LittleFS.open(filename, "w");
     if (!file)
     {
         LOGI("❌ Failed to open %s for writing\n", filename);
@@ -121,21 +121,18 @@ bool loadAllSettings()
             // เช็คว่ามี Key และค่าไม่เป็น String ว่างเปล่า
             if (doc[key].is<String>() && !doc[key].as<String>().isEmpty()) {
                 friendlyNames[i] = doc[key].as<String>();
-            } else {
-                // ค่าเริ่มต้นกรณีในไฟล์ไม่มี หรือเป็นค่าว่าง
-                friendlyNames[i] = "Relay Channel " + String(i + 1);
             }
+            // ถ้าว่างหรือไม่มี Key จะคงค่า friendlyNames[i] เดิมเอาไว้
         }
 
         // 2. เช็คเงื่อนไขคีย์ device_name
-        if (doc["device_name"].is<const char*>()) {
+        if (doc["device_name"].is<const char*>() && strlen(doc["device_name"].as<const char*>()) > 0) {
             strlcpy(DEVICE_NAME, doc["device_name"].as<const char*>(), sizeof(DEVICE_NAME));
             LOGD("  Device Name loaded: %s", DEVICE_NAME);
         } else {
-            LOGW("⚠️ Key 'device_name' not found in setting.json (Skipped)");
+            LOGW("⚠️ Key 'device_name' empty or not found in setting.json (Using default)");
         }
 
-        // Log แสดงผลสำเร็จและการรายละเอียดการตั้งค่า
         LOGI("✅ General settings loaded successfully");
         for (int i = 0; i < 6; i++) {
             LOGD("   - Friendly Name %d: %s", i + 1, friendlyNames[i].c_str());
@@ -143,26 +140,16 @@ bool loadAllSettings()
     }
     else
     {
-        LOGW("⚠️ Failed to load setting.json (Using default names)");
-        
-        // กำหนดค่า Default กรณีเปิดไฟล์ไม่ได้
-        for (int i = 0; i < 6; i++) {
-            friendlyNames[i] = "Relay Channel " + String(i + 1);
-        }
+        LOGW("⚠️ Failed to load /setting.json (Using default names)");
     }
 
     return true;
 }
 
-// บันทึกเฉพาะโหมด WiFi (เช่น เมื่อกดเปลี่ยนโหมดผ่านปุ่ม IO0)
 bool saveWifiModeSetting()
 {
     JsonDocument doc;
-
-    // โหลดไฟล์เดิมมาก่อนเพื่อไม่ให้ค่าอื่นๆ หาย
     loadJsonFile("/networkconfig.json", doc);
-
     doc["wifi_mode"] = isWifiApMode;
-
     return saveJsonFile("/networkconfig.json", doc);
 }
