@@ -7,8 +7,8 @@ File fsUploadFile;
 
 // --- Device Info ---
 char D_SWVersion[15] = "1.0.0"; //1.2.8
-char D_Mfac[15] = "Waveshare"; //ARTTECH
-char D_Model[28] = "ARTTECH"; //ESP32-S3-Relay-6CH
+char D_Mfac[15] = "ARTTECH"; //ARTTECH
+char D_Model[28] = "WAVESHARE"; //ESP32-S3-Relay-6CH
 
 // --- Network Settings ---
 char DEVICE_NAME[40] ; // ESP32-S3 6CH Relay

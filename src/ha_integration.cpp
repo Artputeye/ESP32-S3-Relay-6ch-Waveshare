@@ -1,10 +1,19 @@
 #include "ha_integration.h"
+#include <WiFi.h>
 
 const char *discovery_prefix = "homeassistant";
 char availability_topic[128] = "";
 char state_topic[128] = "";
 
 unsigned long lastMsg = 0;
+
+// ฟังก์ชันช่วยดึง MAC Address แบบไม่มีเครื่องหมาย : (เช่น F412FA47A300)
+String getMacClean()
+{
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  return mac;
+}
 
 void mqtt_callback(char *topic, byte *payload, unsigned int length);
 
@@ -20,7 +29,6 @@ void init_ha_topics()
 
 void iotHAsetup()
 {
-  // โหลดค่า setting.json ก่อนเริ่มตั้งค่า MQTT
   loadAllSettings();
   init_ha_topics();
 
@@ -49,6 +57,7 @@ void iotHAloop()
 
 void send_switch_config(int relay_num)
 {
+  String mac = getMacClean();
   String object_id = "relay_" + String(relay_num);
   String config_topic = String(discovery_prefix) + "/switch/" + DEVICE_NAME + "/" + object_id + "/config";
   String command_topic = String(discovery_prefix) + "/switch/" + DEVICE_NAME + "/" + object_id + "/set";
@@ -68,7 +77,8 @@ void send_switch_config(int relay_num)
   String value_template = String("{{ value_json.") + object_id + " }}";
   doc["value_template"] = value_template.c_str();
 
-  String unique_id = String(DEVICE_NAME) + "_" + object_id;
+  // ใช้ MAC + Object ID เพื่อป้องกัน Unique ID ใน HA ซ้ำกัน
+  String unique_id = mac + "_" + object_id;
   doc["unique_id"] = unique_id.c_str();
 
   doc["payload_on"] = "ON";
@@ -81,7 +91,7 @@ void send_switch_config(int relay_num)
 
   JsonObject dev = doc["device"].to<JsonObject>();
   JsonArray ids = dev["identifiers"].to<JsonArray>();
-  ids.add(DEVICE_NAME);
+  ids.add(mac); // ใช้ MAC Address เป็น Device Identifier หลัก
   dev["name"] = (DEVICE_NAME && strlen(DEVICE_NAME) > 0) ? DEVICE_NAME : "ESP32-S3 6CH Relay WAVESHARE";
   dev["sw_version"] = D_SWVersion;
   dev["manufacturer"] = D_Mfac;
@@ -98,6 +108,7 @@ void send_switch_config(int relay_num)
 
 void send_sensor_config(const char *object_id, const char *name, const char *unit, const char *device_class, const char *icon, const char *category)
 {
+  String mac = getMacClean();
   String config_topic = String(discovery_prefix) + "/sensor/" + DEVICE_NAME + "/" + object_id + "/config";
 
   JsonDocument doc;
@@ -107,7 +118,8 @@ void send_sensor_config(const char *object_id, const char *name, const char *uni
   String value_template = String("{{ value_json.") + object_id + " }}";
   doc["value_template"] = value_template.c_str();
 
-  String unique_id = String() + "_" + object_id;
+  // แก้ไขจุดบั๊กเดิม: เพิ่ม mac นำหน้า unique_id
+  String unique_id = mac + "_" + object_id;
   doc["unique_id"] = unique_id.c_str();
 
   if (unit && strlen(unit) > 0) doc["unit_of_measurement"] = unit;
@@ -121,7 +133,7 @@ void send_sensor_config(const char *object_id, const char *name, const char *uni
 
   JsonObject dev = doc["device"].to<JsonObject>();
   JsonArray ids = dev["identifiers"].to<JsonArray>();
-  ids.add(DEVICE_NAME);
+  ids.add(mac); // ใช้ MAC Address เป็น Device Identifier
   dev["name"] = (DEVICE_NAME && strlen(DEVICE_NAME) > 0) ? DEVICE_NAME : "ESP32-S3 6CH Relay WAVESHARE";
   dev["sw_version"] = D_SWVersion;
   dev["manufacturer"] = D_Mfac;
@@ -227,9 +239,12 @@ void reconnect()
     {
       lastReconnectAttempt = now;
 
-      if (client.connect("ESP32_S3_Relay_6CH", MQTT_USER, MQTT_PASS, availability_topic, 0, true, "offline"))
+      // สร้าง MQTT Client ID ที่ไม่ซ้ำกันตาม MAC Address
+      String client_id = "ESP32_Relay_" + getMacClean();
+
+      if (client.connect(client_id.c_str(), MQTT_USER, MQTT_PASS, availability_topic, 0, true, "offline"))
       {
-        LOGI("connected");
+        LOGI("connected as %s", client_id.c_str());
         send_ha_discovery();
         client.publish(availability_topic, "online", true);
         publish_all_states();
