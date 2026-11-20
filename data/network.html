@@ -32,7 +32,7 @@
 
       <div class="toggle-row">
         <span class="toggle">WIFI MODE
-          <span id="wifi-mode" class="toggle-batt"></span>
+          <span id="wifi-mode" class="toggle-batt">LOADING...</span>
         </span>
 
         <label class="switch">
@@ -43,7 +43,7 @@
 
       <div class="toggle-row">
         <span class="toggle">IP Config
-          <span id="ipConfig" class="toggle-batt"></span>
+          <span id="ipConfig" class="toggle-batt">LOADING...</span>
         </span>
 
         <label class="switch">
@@ -155,7 +155,14 @@
         </form>
       </div>
 
-       <p class="ip-display">IP Address : <span id="esp32-ip"></span></p>
+      <section class="card-main station-status" id="station-status" hidden aria-labelledby="station-status-title">
+        <div class="para-name"><span id="station-status-title">STATION STATUS</span></div>
+        <div class="display-row"><span class="label">IP Address</span><strong class="value" id="station-ip">--</strong></div>
+        <div class="display-row"><span class="label">MAC Address</span><strong class="value" id="station-mac">--</strong></div>
+        <div class="display-row"><span class="label">Uptime</span><strong class="value" id="station-uptime">--</strong></div>
+        <div class="display-row"><span class="label">WiFi Signal</span><strong class="value" id="station-rssi">--</strong></div>
+      </section>
+
 
       <div class="card-middle">
         <button class="button-save" onclick="sendConfig()">SAVE</button>
@@ -164,7 +171,7 @@
   </div>
 
   <script src="info.js"></script>
-  <script src="network.js"></script>
+  <script src="network.js?v=2"></script>
 </body>
 
 </html>

@@ -37,15 +37,53 @@ void iotHAsetup()
   client.setBufferSize(4096);
   client.setKeepAlive(60);
   client.setSocketTimeout(60);
+
+  LOGI("[MQTT] Diagnostic enabled: broker=%s:%u, username=%s, keepalive=60s, socket_timeout=60s",
+       MQTT_SERVER, MQTT_PORT, MQTT_USER);
+}
+
+// แปลรหัสสถานะจาก PubSubClient เพื่อใช้วิเคราะห์สาเหตุที่ MQTT หลุด
+const char *mqttStateName(int state)
+{
+  switch (state)
+  {
+  case MQTT_CONNECTION_TIMEOUT: return "connection timeout";
+  case MQTT_CONNECTION_LOST: return "connection lost";
+  case MQTT_CONNECT_FAILED: return "connect failed";
+  case MQTT_DISCONNECTED: return "disconnected";
+  case MQTT_CONNECTED: return "connected";
+  case MQTT_CONNECT_BAD_PROTOCOL: return "bad protocol";
+  case MQTT_CONNECT_BAD_CLIENT_ID: return "bad client ID";
+  case MQTT_CONNECT_UNAVAILABLE: return "broker unavailable";
+  case MQTT_CONNECT_BAD_CREDENTIALS: return "bad credentials";
+  case MQTT_CONNECT_UNAUTHORIZED: return "unauthorized";
+  default: return "unknown MQTT state";
+  }
 }
 
 void iotHAloop()
 {
-  if (!client.connected())
+  static bool wasConnected = false;
+  const bool connectedBeforeLoop = client.connected();
+
+  // บันทึกเฉพาะตอนเปลี่ยนจาก Connected เป็น Disconnected ไม่พิมพ์ซ้ำทุก loop
+  if (wasConnected && !connectedBeforeLoop)
+  {
+    const int state = client.state();
+    LOGW("[MQTT] Disconnected. state=%d (%s), WiFi=%s, IP=%s, RSSI=%d dBm, uptime=%lu ms",
+         state, mqttStateName(state),
+         WiFi.status() == WL_CONNECTED ? "connected" : "disconnected",
+         WiFi.localIP().toString().c_str(), WiFi.RSSI(),
+         static_cast<unsigned long>(millis()));
+  }
+
+  if (!connectedBeforeLoop)
   {
     reconnect();
   }
+
   client.loop();
+  wasConnected = client.connected();
 
   unsigned long now = millis();
   if (now - lastMsg > 3000)
@@ -239,15 +277,30 @@ void reconnect()
     {
       lastReconnectAttempt = now;
 
-      // สร้าง MQTT Client ID ที่ไม่ซ้ำกันตาม MAC Address
-      String client_id = "ESP32_Relay_" + getMacClean();
+      // ใช้ Device Name ร่วมกับ MAC เพื่อให้ Client ID ไม่ซ้ำกันในแต่ละอุปกรณ์
+      const char *deviceName = (DEVICE_NAME[0] != '\0') ? DEVICE_NAME : "ESP32_Relay";
+      String client_id = String(deviceName) + "_" + getMacClean();
+      LOGI("[MQTT] Connect attempt: server=%s:%u, client_id=%s, mac=%s, ip=%s, WiFi=%s, RSSI=%d dBm, heap=%u",
+           MQTT_SERVER, MQTT_PORT, client_id.c_str(), WiFi.macAddress().c_str(),
+           WiFi.localIP().toString().c_str(),
+           WiFi.status() == WL_CONNECTED ? "connected" : "disconnected",
+           WiFi.RSSI(), ESP.getFreeHeap());
 
       if (client.connect(client_id.c_str(), MQTT_USER, MQTT_PASS, availability_topic, 0, true, "offline"))
       {
-        LOGI("connected as %s", client_id.c_str());
+        LOGI("[MQTT] Connected: client_id=%s, broker=%s:%u, ip=%s",
+             client_id.c_str(), MQTT_SERVER, MQTT_PORT, WiFi.localIP().toString().c_str());
         send_ha_discovery();
         client.publish(availability_topic, "online", true);
         publish_all_states();
+      }
+      else
+      {
+        const int state = client.state();
+        LOGW("[MQTT] Connect failed: state=%d (%s), WiFi=%s, IP=%s, RSSI=%d dBm, heap=%u",
+             state, mqttStateName(state),
+             WiFi.status() == WL_CONNECTED ? "connected" : "disconnected",
+             WiFi.localIP().toString().c_str(), WiFi.RSSI(), ESP.getFreeHeap());
       }
     }
   }

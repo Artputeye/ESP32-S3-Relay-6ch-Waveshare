@@ -50,6 +50,16 @@ function initWebSocket() {
                 espIpElem.textContent = obj["DIVICE_IP"];
             }
 
+            // Live Station status (visible only when Wi-Fi is in Station mode).
+            const stationIp = document.getElementById("station-ip");
+            const stationMac = document.getElementById("station-mac");
+            const stationUptime = document.getElementById("station-uptime");
+            const stationRssi = document.getElementById("station-rssi");
+            if (stationIp && obj["DIVICE_IP"] !== undefined) stationIp.textContent = obj["DIVICE_IP"] || "--";
+            if (stationMac && obj["MAC Address"] !== undefined) stationMac.textContent = obj["MAC Address"] || "--";
+            if (stationUptime && obj["Uptime"] !== undefined) stationUptime.textContent = formatStationUptime(obj["Uptime"]);
+            if (stationRssi && obj["rssi"] !== undefined) stationRssi.textContent = `${obj["rssi"]} dBm`;
+
             if (obj["Serial"]) {
                 console.log(`Serial : ${obj["Serial"]}`);
                 appendToTerminal(`Serial: ${obj["Serial"]}`);
@@ -67,6 +77,17 @@ function initWebSocket() {
             console.error("Decode error:", err, event.data);
         }
     };
+}
+
+function formatStationUptime(value) {
+    const totalSeconds = Math.max(0, Math.floor(Number(value) / 1000));
+    if (!Number.isFinite(totalSeconds)) return "--";
+
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${days}d ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 // 🔹 ดักเช็กปุ่ม Send ก่อนผูก Event (มีเฉพาะใน info.html)

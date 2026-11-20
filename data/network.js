@@ -36,8 +36,11 @@ function sendConfig() {
 }
 function wifiMode(checkbox) {
   const mode = document.getElementById("wifi-mode");
-  const status = checkbox.checked ? "STATION" : "ACCESS POINT";
+  const isStation = checkbox.checked;
+  const status = isStation ? "STATION" : "ACCESS POINT";
   mode.textContent = status;
+  const stationStatus = document.getElementById("station-status");
+  if (stationStatus) stationStatus.hidden = !isStation;
 }
 
 document.querySelectorAll('.icon-btn').forEach(btn => {
@@ -93,34 +96,34 @@ function loadConfig() {
 
       // Toggle: WIFI MODE
       const wifiToggle = document.getElementById("wifiModeToggle");
-      if (config.wifi_mode === "1") {
+      if (Number(config.wifi_mode) === 1 || config.wifi_mode === true) {
         wifiToggle.checked = true;
         document.getElementById("wifi-mode").textContent = "STATION";
       } else {
         wifiToggle.checked = false;
         document.getElementById("wifi-mode").textContent = "ACCESS POINT";
       }
+      wifiMode(wifiToggle);
 
       // Toggle: IP CONFIG
       const ipConfigToggle = document.getElementById("ipConfigToggle");
-      if (config.ip_config === "1") {
-        ipConfigToggle.checked = true;
-        document.getElementById("ip-hide").style.display = "block";
-      } else {
-        ipConfigToggle.checked = false;
-        document.getElementById("ip-hide").style.display = "none";
-      }
+      ipConfigToggle.checked = Number(config.ip_config) === 1 || config.ip_config === true;
+      IPconfig(ipConfigToggle);
     })
-    .catch(err => console.error("Config load error:", err));
+    .catch(err => {
+      console.error("Config load error:", err);
+      const modeLabel = document.getElementById("wifi-mode");
+      if (modeLabel) modeLabel.textContent = "UNAVAILABLE";
+      const ipLabel = document.getElementById("ipConfig");
+      if (ipLabel) ipLabel.textContent = "UNAVAILABLE";
+    });
 }
 
 // เวลา toggle IP Config เปลี่ยน
 function IPconfig(el) {
-  if (el.checked) {
-    document.getElementById("ip-hide").style.display = "block";
-  } else {
-    document.getElementById("ip-hide").style.display = "none";
-  }
+  const label = document.getElementById("ipConfig");
+  if (label) label.textContent = el.checked ? "STATIC" : "DHCP";
+  document.getElementById("ip-hide").style.display = el.checked ? "block" : "none";
 }
 
 function toggleSetting(checkbox, settingName) {

@@ -332,6 +332,26 @@ input[type="text"] {
   color: #000000;
 }
 
+/* Station status: clean rows without individual borders. */
+.station-status {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.station-status .display-row {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 7px 0;
+  margin-bottom: 0;
+  font-size: 12px;
+}
+
+.station-status .label,
+.station-status .value {
+  font-size: 12px;
+}
+
 .value-container {
   display: flex;
   gap: 4px;

@@ -14,6 +14,8 @@ String wsAllDataBase64()
     // --- ข้อมูลระบบทั่วไป ---
     doc["device_name"] = DEVICE_NAME; // เพิ่ม device_name ส่งไปแสดงบนหน้า index.html และ relay.html
     doc["DIVICE_IP"] = DIVICE_IP;
+    doc["MAC Address"] = MacAddr;
+    doc["Uptime"] = millis();
     doc["rssi"] = WiFi.RSSI();
     doc["Serial"] = wsSerial;
 
