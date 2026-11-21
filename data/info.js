@@ -61,8 +61,12 @@ function initWebSocket() {
             if (stationRssi && obj["rssi"] !== undefined) stationRssi.textContent = `${obj["rssi"]} dBm`;
 
             if (obj["Serial"]) {
-                console.log(`Serial : ${obj["Serial"]}`);
-                appendToTerminal(`Serial: ${obj["Serial"]}`);
+                console.log(`Serial: ${obj["Serial"]}`);
+                appendToTerminal(`[SERIAL] ${obj["Serial"]}`, "received");
+            }
+            if (obj["LOG"]) {
+                console.log(`LOG: ${obj["LOG"]}`);
+                appendToTerminal(obj["LOG"], "log");
             }
             if (obj["Inverter"]) {
                 console.log(`Inverter: ${obj["Inverter"]}`);
@@ -133,11 +137,12 @@ if (messageInput) {
 }
 
 // 🔹 ปรับปรุงฟังก์ชัน Terminal ให้ปลอดภัย ตรวจสอบโครงสร้างก่อนต่อ Element
-function appendToTerminal(message) {
+function appendToTerminal(message, type = "system") {
     const termElem = document.getElementById("terminal");
     if (termElem) {
         const div = document.createElement("div");
         div.textContent = message;
+        div.className = `terminal-message ${type}`;
         termElem.appendChild(div);
         termElem.scrollTop = termElem.scrollHeight;
     } else {

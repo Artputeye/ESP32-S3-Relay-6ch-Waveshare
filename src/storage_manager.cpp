@@ -130,7 +130,8 @@ bool loadAllSettings()
             strlcpy(DEVICE_NAME, doc["device_name"].as<const char*>(), sizeof(DEVICE_NAME));
             LOGD("  Device Name loaded: %s", DEVICE_NAME);
         } else {
-            LOGW("⚠️ Key 'device_name' empty or not found in setting.json (Using default)");
+            strlcpy(DEVICE_NAME, "ESP32-S3-Relay-6CH", sizeof(DEVICE_NAME));
+            LOGW("⚠️ Key 'device_name' empty or not found in setting.json (Using default: %s)", DEVICE_NAME);
         }
 
         LOGI("✅ General settings loaded successfully");

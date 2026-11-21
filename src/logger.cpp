@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "websocket_handler.h"
 
 #define LOG_FILE_PATH "/system_log.txt"
 #define MAX_LOG_SIZE_BYTES 10240 
@@ -12,47 +13,79 @@ static QueueHandle_t logQueue;
 
 void LoggerBegin()
 {
-    logQueue = xQueueCreate(100, sizeof(LogMessage));
+    if (logQueue != NULL)
+    {
+        return;
+    }
 
-    xTaskCreatePinnedToCore(
+    Serial.printf("[LOGGER] creating queue | heap_before=%u\r\n", ESP.getFreeHeap());
+    logQueue = xQueueCreate(100, sizeof(LogMessage));
+    if (logQueue == NULL)
+    {
+        Serial.printf("[LOGGER][ERROR] queue creation failed | heap=%u\r\n", ESP.getFreeHeap());
+        Serial.flush();
+        return;
+    }
+    Serial.printf("[LOGGER] queue created | heap_after=%u\r\n", ESP.getFreeHeap());
+
+    BaseType_t taskCreated = xTaskCreatePinnedToCore(
         LoggerTask,
         "Logger",
         4096,
         NULL,
-        1,
+        2,
         NULL,
         0);
+
+    if (taskCreated != pdPASS)
+    {
+        Serial.printf("[LOGGER][ERROR] LoggerTask creation failed: %d\r\n", static_cast<int>(taskCreated));
+        vQueueDelete(logQueue);
+        logQueue = NULL;
+        Serial.flush();
+        return;
+    }
+
+    Serial.printf("[LOGGER] LoggerTask created | heap=%u\r\n", ESP.getFreeHeap());
+    Serial.flush();
 }
 
 void logPrintf(const char *level, const char *file, int line, const char *fmt, ...)
 {
-    if (logQueue == NULL) return;
-
     LogMessage msg;
 
     int offset = snprintf(msg.text, sizeof(msg.text),
                           "[%10lu][%-5s][%s:%d] ",
                           millis(), level, file, line);
 
+    if (offset < 0 || offset >= static_cast<int>(sizeof(msg.text)))
+    {
+        return;
+    }
+
     va_list args;
     va_start(args, fmt);
     vsnprintf(msg.text + offset, sizeof(msg.text) - offset, fmt, args);
     va_end(args);
 
-    xQueueSend(logQueue, &msg, 0); 
+    // Never silently discard logs if queue creation failed or the queue is full.
+    if (logQueue == NULL || xQueueSend(logQueue, &msg, 0) != pdPASS)
+    {
+        Serial.println(msg.text);
+    }
 }
 
 void LoggerTask(void *pv)
 {
     LogMessage msg;
 
-    while (true)
+    for (;;)
     {
-        if (xQueueReceive(logQueue, &msg, portMAX_DELAY))
+        if (xQueueReceive(logQueue, &msg, portMAX_DELAY) == pdTRUE)
         {
-            Serial.println(msg.text); // พิมพ์ออกเป็นบรรทัดเต็มๆ เสมอ
+            Serial.println(msg.text);
+            wsJsonLog(String(msg.text));
         }
-        vTaskDelay(pdMS_TO_TICKS(1)); 
     }
 }
 

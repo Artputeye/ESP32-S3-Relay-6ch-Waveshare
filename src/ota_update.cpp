@@ -9,44 +9,91 @@ void setupOTAManagement() {
 }
 
 // --- 1. Firmware & Partition Update ---
-void handleFirmwareUpload() {
-    server.on("/otafirmware", HTTP_POST, 
-        [](AsyncWebServerRequest *request) {
-            bool success = !Update.hasError();
-            if (success) {
-                request->send(200, "text/plain", "OK");
-                vTaskDelay(pdMS_TO_TICKS(1000));
-                ESP.restart();
-            } else {
-                request->send(500, "text/plain", "Update Failed");
+static volatile bool firmwareUploadComplete = false;
+static volatile bool firmwareUploadFailed = false;
+
+static void restartAfterFirmwareOTA(void *parameter)
+{
+    // Give AsyncWebServer time to flush the HTTP response to the browser.
+    vTaskDelay(pdMS_TO_TICKS(2500));
+    ESP.restart();
+    vTaskDelete(NULL);
+}
+
+void handleFirmwareUpload()
+{
+    server.on("/otafirmware", HTTP_POST,
+        [](AsyncWebServerRequest *request)
+        {
+            if (firmwareUploadComplete && !firmwareUploadFailed && !Update.hasError())
+            {
+                BaseType_t taskCreated = xTaskCreate(
+                    restartAfterFirmwareOTA,
+                    "OTA_Restart",
+                    2048,
+                    NULL,
+                    1,
+                    NULL);
+
+                if (taskCreated == pdPASS)
+                {
+                    request->send(200, "text/plain", "Firmware uploaded successfully. Device restarting.");
+                }
+                else
+                {
+                    LOGE("[OTA] Could not create restart task.");
+                    request->send(500, "text/plain", "Firmware uploaded, but restart task could not be created. Please restart the device manually.");
+                }
+            }
+            else
+            {
+                ledMode = LED_DISCONNECTED;
+                request->send(500, "text/plain", "Firmware update failed. Device was not restarted.");
+                LOGE("[OTA] Upload failed; device will remain running.");
             }
         },
-        [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-            if (index == 0) {
+        [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+        {
+            if (index == 0)
+            {
+                firmwareUploadComplete = false;
+                firmwareUploadFailed = false;
                 ledMode = LED_BUSY;
-                LOGI("[OTA] Start: %s\n", filename.c_str());
-                
-                // ตรวจสอบพื้นที่ว่าง (U_FLASH สำหรับ Firmware, U_SPIFFS สำหรับ LittleFS)
-                if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
+                LOGI("[OTA] Start: %s", filename.c_str());
+
+                if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH))
+                {
+                    firmwareUploadFailed = true;
                     Update.printError(Serial);
                 }
             }
 
-            if (!Update.hasError()) {
-                if (Update.write(data, len) != len) {
+            if (!firmwareUploadFailed && !Update.hasError())
+            {
+                if (Update.write(data, len) != len)
+                {
+                    firmwareUploadFailed = true;
                     Update.printError(Serial);
                 }
             }
 
-            if (final) {
-                if (Update.end(true)) {
-                    LOGI("[OTA] Success: %u bytes\n", index + len);
-                } else {
+            if (final)
+            {
+                if (!firmwareUploadFailed && Update.end(true))
+                {
+                    firmwareUploadComplete = true;
+                    LOGI("[OTA] Success: %u bytes", static_cast<unsigned int>(index + len));
+                }
+                else
+                {
+                    firmwareUploadFailed = true;
+                    firmwareUploadComplete = false;
+                    ledMode = LED_DISCONNECTED;
                     Update.printError(Serial);
+                    LOGE("[OTA] Finalizing firmware failed.");
                 }
             }
-        }
-    );
+        });
 }
 
 // --- 2. Upload File to LittleFS ---

@@ -9,6 +9,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len);
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 void ws_init();
 void wsJsonSerial(const String &msg);
+void wsJsonLog(const String &msg);
 void wsProcess();
 
 #endif

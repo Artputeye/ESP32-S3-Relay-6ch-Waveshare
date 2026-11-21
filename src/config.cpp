@@ -11,7 +11,7 @@ char D_Mfac[15] = "ARTTECH"; //ARTTECH
 char D_Model[28] = "WAVESHARE"; //ESP32-S3-Relay-6CH
 
 // --- Network Settings ---
-char DEVICE_NAME[40] ; // ESP32-S3 6CH Relay
+char DEVICE_NAME[40] = "ESP32-S3-Relay-6CH"; // Default device name used by MQTT and Home Assistant
 char DEVICE_PASS[28] = "12345678"; //12345678
 char WIFI_SSID[30] = "";
 char WIFI_PASS[25] = "";

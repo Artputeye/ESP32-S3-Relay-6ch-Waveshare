@@ -6,6 +6,7 @@ unsigned long lastPingTime = 0;
 unsigned long MonitorDelay = 1000;         // อัปเดตสถานะให้เรียลไทม์ขึ้น (ทุก 1 วินาที)
 const unsigned long pingInterval = 25000;   // 25 วินาที
 String wsSerial;
+String wsLog;
 
 String wsAllDataBase64()
 {
@@ -18,6 +19,7 @@ String wsAllDataBase64()
     doc["Uptime"] = millis();
     doc["rssi"] = WiFi.RSSI();
     doc["Serial"] = wsSerial;
+    doc["LOG"] = wsLog;
 
     // --- สถานะ Relay ทั้ง 6 ช่อง ---
     JsonObject relays = doc["relays"].to<JsonObject>();
@@ -134,6 +136,16 @@ void wsJsonSerial(const String &msg)
         notifyClients(wsAllDataBase64());
         wsSerial = "";
         vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
+void wsJsonLog(const String &msg)
+{
+    if (!msg.isEmpty())
+    {
+        wsLog = msg;
+        notifyClients(wsAllDataBase64());
+        wsLog = "";
     }
 }
 

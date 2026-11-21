@@ -74,26 +74,47 @@ function upload() {
       }
     };
 
+    let requestBodySent = false;
+
+    xhr.upload.onload = () => {
+      requestBodySent = true;
+    };
+
     xhr.onload = () => {
       if (xhr.status === 200) {
         uploaded += file.size;
-        const currentProgress = ((uploaded / totalSize) * 100).toFixed(1);
-        console.log(
-          `[Success] Uploaded: "${path}" | Total Progress: ${currentProgress}% (${index + 1}/${files.length} files done)`
-        );
+        progress.value = totalSize > 0 ? (uploaded / totalSize) * 100 : 100;
+        console.log(`[Success] Uploaded: "${path}"`);
+
+        if (type === "otafirmware") {
+          alert("Firmware uploaded successfully. The device is restarting. Please wait before reconnecting.");
+          return;
+        }
+
         uploadFile(index + 1);
       } else {
         console.error(`[Failed] Upload failed for "${path}" with status ${xhr.status}`);
-        alert("Upload failed: " + xhr.responseText);
+        alert("Upload failed: " + (xhr.responseText || ("HTTP " + xhr.status)));
         progress.value = 0;
       }
     };
 
     xhr.onerror = () => {
-      alert("Network error while uploading " + path);
+      if (type === "otafirmware" && requestBodySent) {
+        progress.value = 100;
+        alert("Firmware data was sent. The device may be restarting and the connection was closed. Wait 20-30 seconds, then reconnect and verify the firmware version.");
+      } else {
+        alert("Network error while uploading " + path + ". Check the device connection and try again.");
+        progress.value = 0;
+      }
+    };
+
+    xhr.ontimeout = () => {
+      alert("Upload timed out while sending " + path + ". Check the device before retrying.");
       progress.value = 0;
     };
 
+    xhr.timeout = 120000;
     xhr.open("POST", "/" + type);
     xhr.send(formData);
   }
